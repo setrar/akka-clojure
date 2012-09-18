@@ -31,7 +31,9 @@
 (defn wait [future]
   (Await/result future (Duration/create 5 TimeUnit/SECONDS)))
 
-(defn reply [msg]
+(defn reply
+  "Reply to the sender of a message. Can ONLY be used from within an actor."
+  [msg]
   (if (nil? self)
     (throw (RuntimeException. "Reply can only be used in the context of an actor"))
     (let [sender (.getSender self)]
@@ -42,7 +44,9 @@
 		   (apply [t] (fun t)))]
     (proxy [OneForOneStrategy] [max-retries (Duration/Inf) function])))
       
-(defn ! [actor msg]
+(defn !
+  "Send a message to the actor."
+  [actor msg]
   (.tell actor msg))
 		     
 (defn- make-actor [context fun]
@@ -56,6 +60,9 @@
 				(binding [self this]
 				  (fun msg)))))))))
 
-(defn actor [fun]
+(defn actor 
+  "Create a new actor. If called in the context of another actor,
+this function will create a parent-child relationship."
+  [fun]
   (make-actor (if (nil? self) *actor-system* self) fun))
       
