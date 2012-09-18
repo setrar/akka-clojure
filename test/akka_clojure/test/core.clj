@@ -11,3 +11,4 @@
 			   "baz")))
 	val (wait (ask a "foo" (millis 500)))]
     (is (= "bar" val))))
+

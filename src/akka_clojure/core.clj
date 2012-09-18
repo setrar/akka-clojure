@@ -2,7 +2,8 @@
        :doc "Simple clojure library for interacting with Akka actors"}
   akka-clojure.core
   (:import
-   [akka.actor ActorRef ActorSystem Props UntypedActor UntypedActorFactory]
+   [akka.actor ActorRef ActorSystem Props UntypedActor UntypedActorFactory OneForOneStrategy]
+   [akka.japi Function]
    [akka.pattern Patterns]
    [akka.dispatch Await]
    [akka.util Duration]
@@ -36,13 +37,25 @@
     (let [sender (.getSender self)]
       (.tell sender msg))))
 
+(defn one-for-one [max-retries fun]
+  (let [function (proxy [Function] []
+		   (apply [t] (fun t)))]
+    (proxy [OneForOneStrategy] [max-retries (Duration/Inf) function])))
+      
+(defn ! [actor msg]
+  (.tell actor msg))
+		     
+(defn- make-actor [context fun]
+  (.actorOf context
+	    (.withCreator
+	     (Props.)
+	     (proxy [UntypedActorFactory] []
+	       (create
+		[] (proxy [UntypedActor] []
+		     (onReceive [msg]
+				(binding [self this]
+				  (fun msg)))))))))
+
 (defn actor [fun]
-  (.actorOf *actor-system*
-   (.withCreator
-    (Props.)
-    (proxy [UntypedActorFactory] []
-      (create
-       [] (proxy [UntypedActor] []
-	    (onReceive [msg]
-		       (binding [self this]
-			 (fun msg)))))))))
+  (make-actor (if (nil? self) *actor-system* self) fun))
+      
