@@ -45,7 +45,7 @@
     (proxy [OneForOneStrategy] [max-retries (Duration/Inf) function])))
       
 (defn !
-  "Send a message to the actor."
+  "Send a message to an actor."
   [actor msg]
   (.tell actor msg))
 		     
