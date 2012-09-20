@@ -1,4 +1,5 @@
 /pom.xml
+*~
 *jar
 /lib
 /classes
@@ -6,3 +7,4 @@
 /.lein-failures
 /checkouts
 /.lein-deps-sum
+/target
