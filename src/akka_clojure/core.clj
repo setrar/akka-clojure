@@ -74,32 +74,34 @@
 	   [OneForOneStrategy]
 	   [max-retries within-time-range function]))))
       
+(defn- actor-factory [actor]
+  (.withCreator
+   (Props.)
+   (proxy [UntypedActorFactory] []
+     (create [] (actor)))))
 
 (defn- make-actor
-  ([context fun]
+  ([ctx fun]
      (make-actor context nil fun))
-  ([context supervisor-strategy fun]
+  ([ctx supervisor-strategy fun]
      (let [state (atom {})]
        (.actorOf
-	context
-	(.withCreator
-	 (Props.)
-	 (proxy [UntypedActorFactory] []
-	   (create []
-		   (proxy [UntypedActor] []
-		     (supervisorStrategy
-		      []
-		      (if (nil? supervisor-strategy)
-			(proxy-super supervisorStrategy)
-			supervisor-strategy))
-		     (onReceive
-		      [msg]
-		      (binding [self this
-				context (.getContext this)
-				sender (.getSender this)
-				parent (.. this (getContext) (parent))]
-			(let [next-state (fun msg @state)]
-			  (reset! state next-state))))))))))))
+	ctx
+	(actor-factory
+	  #(proxy [UntypedActor] []
+	     (supervisorStrategy
+	      []
+	      (if (nil? supervisor-strategy)
+		(proxy-super supervisorStrategy)
+		supervisor-strategy))
+	     (onReceive
+	      [msg]
+	      (binding [self this
+			context (.getContext this)
+			sender (.getSender this)
+			parent (.. this (getContext) (parent))]
+		(let [next-state (fun msg @state)]
+		  (reset! state next-state))))))))))
 
 (defn actor 
   "Create a new actor. If called in the context of another actor,
