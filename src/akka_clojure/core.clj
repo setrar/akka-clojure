@@ -2,9 +2,8 @@
        :doc "Simple clojure library for interacting with Akka actors"}
   akka-clojure.core
   (:import
-   [akka.actor ActorRef ActorSystem Props
-    UntypedActor UntypedActorFactory
-    OneForOneStrategy SupervisorStrategy]
+   [akka.actor ActorRef ActorSystem Props UntypedActor
+    UntypedActorFactory OneForOneStrategy SupervisorStrategy]
    [akka.japi Function]
    [akka.pattern Patterns]
    [akka.dispatch Await]
@@ -33,17 +32,29 @@
     :unit TimeUnit/MILLISECONDS
     :value val))
 
-(defn ask
+(defn ?
   ([^ActorRef actor msg timeout]
      (Patterns/ask actor msg (to-millis timeout))))
 
+(def ask ?)
+
 (defn wait [future]
-  (Await/result future (Duration/create 5 TimeUnit/SECONDS)))
+  (Await/result future (Duration/create 20 TimeUnit/SECONDS)))
 
 (defn !
   "Send a message to an actor."
   [actor msg]
   (.tell actor msg))
+
+(def tell !)
+
+(defn parent []
+  (if (nil? self)
+    (throw (RuntimeException. "Parent can only be used in the context of an actor"))
+    (.. self (getContext) (parent))))
+
+(defn sender []
+  (.getSender self))
 
 (defn reply
   "Reply to the sender of a message. Can ONLY be used from within an actor."
@@ -67,22 +78,24 @@
   ([context fun]
      (make-actor context nil fun))
   ([context supervisor-strategy fun]
-     (.actorOf
-      context
-      (.withCreator
-       (Props.)
-       (proxy [UntypedActorFactory] []
-	 (create []
-		 (proxy [UntypedActor] []
-		   (supervisorStrategy
-		    []
-		    (if (nil? supervisor-strategy)
-		      (proxy-super supervisorStrategy)
-		      supervisor-strategy))
-		   (onReceive
-		    [msg]
-		    (binding [self this]
-		      (fun msg))))))))))
+     (let [state (atom {})]
+       (.actorOf
+	context
+	(.withCreator
+	 (Props.)
+	 (proxy [UntypedActorFactory] []
+	   (create []
+		   (proxy [UntypedActor] []
+		     (supervisorStrategy
+		      []
+		      (if (nil? supervisor-strategy)
+			(proxy-super supervisorStrategy)
+			supervisor-strategy))
+		     (onReceive
+		      [msg]
+		      (binding [self this]
+			(let [next-state (fun msg @state)]
+			  (reset! state next-state))))))))))))
 
 (defn actor 
   "Create a new actor. If called in the context of another actor,
