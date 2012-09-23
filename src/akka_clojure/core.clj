@@ -80,37 +80,48 @@
    (proxy [UntypedActorFactory] []
      (create [] (actor)))))
 
+(defmacro proxy-super-if-nil [fun method & args]
+  `(if (nil? ~fun)
+     (proxy-super ~method ~@args)
+     (~fun ~@args)))
+
 (defn- make-actor
-  ([ctx fun]
-     (make-actor context nil fun))
-  ([ctx supervisor-strategy fun]
-     (let [state (atom {})]
-       (.actorOf
-	ctx
-	(actor-factory
-	  #(proxy [UntypedActor] []
-	     (supervisorStrategy
-	      []
-	      (if (nil? supervisor-strategy)
-		(proxy-super supervisorStrategy)
-		supervisor-strategy))
-	     (onReceive
-	      [msg]
-	      (binding [self this
-			context (.getContext this)
-			sender (.getSender this)
-			parent (.. this (getContext) (parent))]
-		(let [next-state (fun msg @state)]
-		  (reset! state next-state))))))))))
+  [ctx fun {:keys [supervisor-strategy
+		   post-stop
+		   pre-start
+		   pre-restart
+		   post-restart]}] 
+  (let [state (atom {})]
+    (.actorOf
+     ctx
+     (actor-factory
+      #(proxy [UntypedActor] []
+	 (postStop [] (proxy-super-if-nil post-stop postStop))
+	 (preStart [] (proxy-super-if-nil pre-start preStart))
+	 (preRestart [reason msg] (proxy-super-if-nil pre-restart preRestart reason msg))
+	 (postRestart [reason] (proxy-super-if-nil post-restart restart))
+	 (supervisorStrategy
+	  []
+	  (if (nil? supervisor-strategy)
+	    (proxy-super supervisorStrategy)
+	    supervisor-strategy))
+	 (onReceive
+	  [msg]
+	  (binding [self this
+		    context (.getContext this)
+		    sender (.getSender this)
+		    parent (.. this (getContext) (parent))]
+	    (let [next-state (fun msg @state)]
+	      (reset! state next-state)))))))))
 
 (defn actor 
   "Create a new actor. If called in the context of another actor,
 this function will create a parent-child relationship."
   ([fun]
-     (actor fun nil))
-  ([fun supervisor-strategy]
+     (actor fun {}))
+  ([fun map]
      (make-actor
       (if (nil? self) *actor-system* (.getContext self))
-      supervisor-strategy
-      fun)))
-      
+      fun
+      map)))
+

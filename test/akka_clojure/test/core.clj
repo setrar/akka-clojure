@@ -23,10 +23,11 @@
 			    (let [c (actor child)]
 			      (! c msg)
 			      (reply "ok")))
-			  (one-for-one
-			   #(let [msg (.getMessage %)]
-			      (reset! proof msg)
-			      stop)))
+			  {:supervisor-strategy
+			   (one-for-one
+			    #(let [msg (.getMessage %)]
+			       (reset! proof msg)
+			       stop)) })
 	val (wait (ask supervisor "hi" (millis 3000)))]
     (Thread/sleep 1000)
     (is (= "ok" val))
@@ -69,3 +70,12 @@
   (let [sv (actor supervisor)
 	res (wait (? sv {:type :start, :value 10} (millis 10000)))]
     (is (= 4037913 res))))
+
+(deftest pre-start
+  (let [proof (atom 0)
+	a (actor (fn [msg _] (reply "hi"))
+		 { :pre-start #(reset! proof 1) })
+	val (wait (? a "hello" (millis 10000)))]
+    (is (= "hi" val))
+    (is (= 1 @proof))))
+	
