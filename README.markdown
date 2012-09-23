@@ -2,9 +2,6 @@
 akka-clojure
 ============
 
-Description
------------
-
 akka-clojure is a simple Clojure wrapper for Akka.
 
 Usage
