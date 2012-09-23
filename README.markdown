@@ -58,6 +58,19 @@ to the callback, which instructs the child to stop on a one for one basis.
 The four actions that may be taken on child failure are resume, restart,
 escalate, and stop.
 
+As you may have guessed the '!' function corresponds to Akka's 'tell,'
+which can also be used. Additionally, for synchronous interaction, you
+can use Akka's 'ask' pattern, which is available through '?'.
+
+```clojure
+(let [a (actor (fn [msg _] (reply "hi")))]
+     (println (wait (? a "hello" (millis 500)))))
+```
+
+When this is run, the message "hi" will be printed to the console.
+The third parameter to '?' is the timeout. The reply function is used
+to send a message back to the sender.
+
      
 
 ## License
