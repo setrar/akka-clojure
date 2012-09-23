@@ -49,10 +49,10 @@ when it fails.
 
 To receive failure notifications, you should provide a supervisor strategy
 callback. In the example below, when a child fails, the exception is passed
-to the callback, which instructs the child to stop. 
+to the callback, which instructs the child to stop on a one for one basis. 
 
 ```clojure
-(actor supervisor { :supervisor-strategy #(do (println %) stop) })
+(actor supervisor { :supervisor-strategy (one-for-one #(do (println %) stop)) })
 ```
 
 The four actions that may be taken on child failure are resume, restart,
