@@ -14,6 +14,9 @@
      (ActorSystem/create "default"))
 
 (def ^:dynamic self nil)
+(def ^:dynamic context nil)
+(def ^:dynamic parent nil)
+(def ^:dynamic sender nil)
 
 (defstruct duration :unit :value)
 
@@ -25,44 +28,42 @@
 
 
 (defn to-millis [duration]
-  (.convert TimeUnit/MILLISECONDS (:value duration) (:unit duration)))
+  (.convert TimeUnit/MILLISECONDS
+	    (:value duration)
+	    (:unit duration)))
 
 (defn millis [val]
   (struct-map duration
     :unit TimeUnit/MILLISECONDS
     :value val))
 
-(defn ?
+(defn ask
   ([^ActorRef actor msg timeout]
      (Patterns/ask actor msg (to-millis timeout))))
 
-(def ask ?)
+(def ? ask)
 
-(defn wait [future]
-  (Await/result future (Duration/create 20 TimeUnit/SECONDS)))
+(defn wait
+  ([future]
+     (Await/result future (Duration/Inf)))
+  ([future duration]
+     (Await/result future (Duration/create
+			   (:value duration)
+			   (:unit duration)))))
 
-(defn !
+(defn tell
   "Send a message to an actor."
   [actor msg]
   (.tell actor msg))
 
-(def tell !)
-
-(defn parent []
-  (if (nil? self)
-    (throw (RuntimeException. "Parent can only be used in the context of an actor"))
-    (.. self (getContext) (parent))))
-
-(defn sender []
-  (.getSender self))
+(def ! tell)
 
 (defn reply
   "Reply to the sender of a message. Can ONLY be used from within an actor."
   [msg]
   (if (nil? self)
     (throw (RuntimeException. "Reply can only be used in the context of an actor"))
-    (let [sender (.getSender self)]
-      (! sender msg))))
+    (! sender msg)))
 
 (defn one-for-one
   ([fun] (one-for-one fun -1 (Duration/Inf)))
@@ -93,7 +94,10 @@
 			supervisor-strategy))
 		     (onReceive
 		      [msg]
-		      (binding [self this]
+		      (binding [self this
+				context (.getContext this)
+				sender (.getSender this)
+				parent (.. this (getContext) (parent))]
 			(let [next-state (fun msg @state)]
 			  (reset! state next-state))))))))))))
 

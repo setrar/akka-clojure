@@ -15,7 +15,7 @@
 	val (wait (? a "foo" (millis 500)))]
     (is (= "bar" val))))
 
-(deftest child-works
+(deftest supervisor-invoked
   (let [proof (atom nil)
 	child (fn [msg _]
 		(throw (Exception. "woot")))
@@ -54,13 +54,13 @@
 (defmethod supervisor :start [map state]
 	   (let [n (:value map)
 		 child (fn [n _]
-			 (! (parent)
+			 (! parent
 			    {:type :result,
 			     :value (factorial n)}))]
 	     (doseq [i (range 1 (+ n 1))]
 		 (let [c (actor child)]
 		   (! c i)))
-	     {:sender (sender),
+	     {:sender sender,
 	      :replies 0,
 	      :result 0,
 	      :n n}))
