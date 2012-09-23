@@ -34,7 +34,31 @@ becomes the next state. For example,
 
 will result in "0" and "1" being printed.
 
+You can also create an actor from the context of another actor. In 
+this case, the parent actor supervises its child and will be notified
+when it fails. 
 
+```clojure
+(defn supervisor [msg _]
+      (let [child (actor (fn [msg _] (println msg)))]
+      	   (! child msg)))
+
+(let [s (actor supervisor)]
+     (! s "hello"))
+```
+
+To receive failure notifications, you should provide a supervisor strategy
+callback. In the example below, when a child fails, the exception is passed
+to the callback, which instructs the child to stop. 
+
+```clojure
+(actor supervisor { :supervisor-strategy #(do (println %) stop) })
+```
+
+The four actions that may be taken on child failure are resume, restart,
+escalate, and stop.
+
+     
 
 ## License
 
