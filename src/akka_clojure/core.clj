@@ -86,12 +86,13 @@
      (~fun ~@args)))
 
 (defn- make-actor
-  [ctx fun {:keys [supervisor-strategy
+  [ctx fun {:keys [initial-state
+		   supervisor-strategy
 		   post-stop
 		   pre-start
 		   pre-restart
 		   post-restart]}] 
-  (let [state (atom {})]
+  (let [state (atom initial-state)]
     (.actorOf
      ctx
      (actor-factory
