@@ -7,7 +7,7 @@ akka-clojure is a simple Clojure wrapper for Akka.
 Usage
 -----
 
-Actors are created with the +actor+ function in akka-clojure.core, which
+Actors are created with the *actor* function in akka-clojure.core, which
 takes a callback function with a single parameter, which is the
 received message. The example below shows the basic usage.
 
@@ -19,7 +19,7 @@ received message. The example below shows the basic usage.
 ```
 
 In some cases, it is desirable to carry state between invocations of
-the actor's receive callback. You can use +stateful-actor+ in these
+the actor's receive callback. You can use *stateful-actor* in these
 cases and provide a second parameter to the callback. The result of
 this callback will become the state on the next invocation. For
 example,
@@ -59,9 +59,9 @@ to the callback, which instructs the child to stop on a one for one basis.
 The four actions that may be taken on child failure are resume, restart,
 escalate, and stop.
 
-As you may have guessed the +!+ function corresponds to Akka's +tell+,
+As you may have guessed the +!+ function corresponds to Akka's *tell*,
 which can also be used. Additionally, for synchronous interaction, you
-can use Akka's 'ask' pattern, which is available through +?+ or +ask+.
+can use Akka's 'ask' pattern, which is available through *?* or *ask*.
 
 ```clojure
 (let [a (actor (fn [msg] (reply "hi")))]
@@ -69,11 +69,11 @@ can use Akka's 'ask' pattern, which is available through +?+ or +ask+.
 ```
 
 When this is run, the message "hi" will be printed to the console.
-The third parameter to +?+ is the timeout. The reply function is used
+The third parameter to *?* is the timeout. The reply function is used
 to send a message back to the sender.
 
-Akka-clojure exposes four dynamic variables to an actor: +self+, +context+,
-+sender+ and +parent+. This gives you direct access to the Akka API.
+Akka-clojure exposes four dynamic variables to an actor: *self*, *context*,
+*sender* and *parent*. This gives you direct access to the Akka API.
 For example:
 
 ```clojure
