@@ -21,7 +21,9 @@ usage.
 
 In some cases, it is desirable to carry state between invocations of
 the actor's receive callback. You can use 'stateful-actor' in these
-cases and provide a second parameter to the callback. For example,
+cases and provide a second parameter to the callback. The result of
+this callback will become the state on the next invocation. For
+example,
 
 ```clojure
 (let [a (stateful-actor (fn [msg count]
