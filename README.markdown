@@ -2,7 +2,7 @@
 akka-clojure
 ============
 
-akka-clojure is a simple Clojure wrapper for Akka.
+Akka-clojure is a simple Clojure wrapper for Akka.
 
 Usage
 -----
@@ -22,7 +22,7 @@ In some cases, it is desirable to carry state between invocations of
 the actor's receive callback. You can use *stateful-actor* in these
 cases and provide a second parameter to the callback. The result of
 this callback will become the state on the next invocation. For
-example,
+example:
 
 ```clojure
 (let [a (stateful-actor (fn [msg count]
@@ -33,7 +33,7 @@ example,
      (! a "hi"))    
 ```
 
-will result in "0" and "1" being printed.
+When run, this will print "0" and "1" to the console.
 
 You can also create an actor from the context of another actor. In 
 this case, the parent actor supervises its child and will be notified
