@@ -74,7 +74,7 @@
 	   [OneForOneStrategy]
 	   [max-retries within-time-range function]))))
       
-(defn- actor-factory [actor]
+(defn- make-props [actor]
   (.withCreator
    (Props.)
    (proxy [UntypedActorFactory] []
@@ -85,44 +85,57 @@
      (proxy-super ~method ~@args)
      (~fun ~@args)))
 
-(defn- make-actor
-  [ctx fun {:keys [initial-state
-		   supervisor-strategy
-		   post-stop
-		   pre-start
-		   pre-restart
-		   post-restart]}] 
+(defn- untyped-actor [fun {:keys [initial-state
+				  supervisor-strategy
+				  post-stop
+				  pre-start
+				  pre-restart
+				  post-restart]}]
   (let [state (atom initial-state)]
-    (.actorOf
-     ctx
-     (actor-factory
-      #(proxy [UntypedActor] []
-	 (postStop [] (proxy-super-if-nil post-stop postStop))
-	 (preStart [] (proxy-super-if-nil pre-start preStart))
-	 (preRestart [reason msg] (proxy-super-if-nil pre-restart preRestart reason msg))
-	 (postRestart [reason] (proxy-super-if-nil post-restart restart))
-	 (supervisorStrategy
-	  []
-	  (if (nil? supervisor-strategy)
-	    (proxy-super supervisorStrategy)
-	    supervisor-strategy))
-	 (onReceive
-	  [msg]
-	  (binding [self this
-		    context (.getContext this)
-		    sender (.getSender this)
-		    parent (.. this (getContext) (parent))]
-	    (let [next-state (fun msg @state)]
-	      (reset! state next-state)))))))))
+    #(proxy [UntypedActor] []
+       (postStop [] (proxy-super-if-nil post-stop postStop))
+       (preStart [] (proxy-super-if-nil pre-start preStart))
+       (preRestart [reason msg] (proxy-super-if-nil pre-restart preRestart reason msg))
+       (postRestart [reason] (proxy-super-if-nil post-restart restart))
+       (supervisorStrategy
+	[]
+	(if (nil? supervisor-strategy)
+	  (proxy-super supervisorStrategy)
+	  supervisor-strategy))
+       (onReceive
+	[msg]
+	(binding [self this
+		  context (.getContext this)
+		  sender (.getSender this)
+		  parent (.. this (getContext) (parent))]
+	  (let [next-state (fun msg @state)]
+	    (reset! state next-state)))))))
 
-(defn actor 
+
+(defn- make-actor [ctx fun {name :name
+			    :as map}] 
+  (let [props (make-props (untyped-actor fun map))]
+    (if (nil? name)
+      (.actorOf ctx props)
+      (.actorOf ctx props name))))
+
+(defn stateful-actor
   "Create a new actor. If called in the context of another actor,
 this function will create a parent-child relationship."
   ([fun]
-     (actor fun {}))
+     (stateful-actor fun {}))
   ([fun map]
      (make-actor
       (if (nil? self) *actor-system* (.getContext self))
       fun
       map)))
+
+(defn actor-for [path]
+  (.actorFor (if (nil? context) *actor-system* context) path))
+
+(defn actor
+  ([fun]
+     (actor fun {}))
+  ([fun map]
+     (stateful-actor (fn [msg _] (fun msg)) map)))
 

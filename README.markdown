@@ -8,25 +8,25 @@ Usage
 -----
 
 Actors are created with the actor function in akka-clojure.core, which
-takes a callback function with two parameters. The first parameter is
-the message which has been received. The second is the actor's state,
-and will be explained later. The example below shows the basic usage.
+takes a callback function with two parameters. The parameter is the
+message which has been received. The example below shows the basic
+usage.
 
 ```clojure
 (use '(akka-clojure core))
 
-(let [a (actor (fn [msg _] (println "Received " msg)))]
+(let [a (actor #(println "Received " %))]
      (! a "hello"))
 ```
 
-The purpose of the state parameter in the actor's callback is to allow
-the actor to carry state between invocations. The result of the callback
-becomes the next state. For example,
+In some cases, it is desirable to carry state between invocations of
+the actor's receive callback. You can use 'stateful-actor' in these
+cases and provide a second parameter to the callback. For example,
 
 ```clojure
-(let [a (actor (fn [msg count]
-     	       	   (println count)
-     	       	   (+ count 1))
+(let [a (stateful-actor (fn [msg count]
+          	       	   (println count)
+     			   (+ count 1))
 	       {:initial-state 0})]
      (! a "hi")
      (! a "hi"))    
@@ -39,8 +39,8 @@ this case, the parent actor supervises its child and will be notified
 when it fails. 
 
 ```clojure
-(defn supervisor [msg _]
-      (let [child (actor (fn [msg _] (println msg)))]
+(defn supervisor [msg]
+      (let [child (actor (fn [msg] (println msg)))]
       	   (! child msg)))
 
 (let [s (actor supervisor)]
@@ -63,7 +63,7 @@ which can also be used. Additionally, for synchronous interaction, you
 can use Akka's 'ask' pattern, which is available through '?'.
 
 ```clojure
-(let [a (actor (fn [msg _] (reply "hi")))]
+(let [a (actor (fn [msg] (reply "hi")))]
      (println (wait (? a "hello" (millis 500)))))
 ```
 

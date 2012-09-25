@@ -8,7 +8,7 @@
    [java.lang Thread]))
 
 (deftest ask-works
-  (let [a (actor (fn [msg _]
+  (let [a (actor (fn [msg]
 		   (reply (if (= "foo" msg)
 			    "bar"
 			    "baz"))))
@@ -17,9 +17,9 @@
 
 (deftest supervisor-invoked
   (let [proof (atom nil)
-	child (fn [msg _]
+	child (fn [msg]
 		(throw (Exception. "woot")))
-	supervisor (actor (fn [msg _]
+	supervisor (actor (fn [msg]
 			    (let [c (actor child)]
 			      (! c msg)
 			      (reply "ok")))
@@ -54,7 +54,7 @@
 
 (defmethod supervisor :start [map state]
 	   (let [n (:value map)
-		 child (fn [n _]
+		 child (fn [n]
 			 (! parent
 			    {:type :result,
 			     :value (factorial n)}))]
@@ -67,15 +67,26 @@
 	      :n n}))
 
 (deftest factorial-sum
-  (let [sv (actor supervisor)
+  (let [sv (stateful-actor supervisor)
 	res (wait (? sv {:type :start, :value 10} (millis 10000)))]
     (is (= 4037913 res))))
 
 (deftest pre-start
   (let [proof (atom 0)
-	a (actor (fn [msg _] (reply "hi"))
+	a (actor (fn [msg] (reply "hi"))
 		 { :pre-start #(reset! proof 1) })
 	val (wait (? a "hello" (millis 10000)))]
     (is (= "hi" val))
     (is (= 1 @proof))))
-	
+
+
+(deftest actor-test
+  (let [a (actor #(reply %))
+	val (wait (? a "hi" (millis 500)))]
+    (is (= "hi" val))))
+
+(deftest named-actor
+  (let [a (actor #(reply %) {:name "foo"})
+	b (actor-for "foo")
+	val (wait (? a "hello" (millis 10000)))]
+    (is (= "hello" val))))
