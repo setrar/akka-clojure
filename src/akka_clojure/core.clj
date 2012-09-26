@@ -19,6 +19,7 @@
 (def ^:dynamic sender nil)
 
 (defstruct duration :unit :value)
+(defstruct strategy :type :function :args)
 
 (def escalate (SupervisorStrategy/escalate))
 (def stop (SupervisorStrategy/stop))
@@ -68,40 +69,96 @@
 (defn one-for-one
   ([fun] (one-for-one fun -1 (Duration/Inf)))
   ([fun max-retries within-time-range]
-     (let [function (proxy [Function] []
-		   (apply [t] (fun t)))]
-       (proxy
-	   [OneForOneStrategy]
-	   [max-retries within-time-range function]))))
-      
+     (struct-map strategy
+       :constructor (fn [max-retries within-time-range function]
+		      (OneForOneStrategy. max-retries within-time-range function))
+       :function fun
+       :args [max-retries within-time-range])))
+
 (defn- make-props [actor]
   (.withCreator
    (Props.)
    (proxy [UntypedActorFactory] []
      (create [] (actor)))))
 
-(defmacro proxy-super-if-nil [fun method & args]
+(defmacro super-stateless [method fun & args]
   `(if (nil? ~fun)
      (proxy-super ~method ~@args)
      (~fun ~@args)))
 
-(defn- untyped-actor [fun {:keys [initial-state
-				  supervisor-strategy
-				  post-stop
-				  pre-start
-				  pre-restart
-				  post-restart]}]
+(defn- proxy-stateless-actor
+  [fun {:keys [initial-state
+	       supervisor-strategy
+	       post-stop
+	       pre-start
+	       pre-restart
+	       post-restart]}]
+  #(proxy [UntypedActor] []
+     (postStop
+      []
+      (super-stateless postStop post-stop))
+     (preStart
+      []
+      (super-stateless preStart pre-start))
+     (preRestart
+      [reason msg]
+      (super-stateless preRestart pre-restart reason msg))
+     (postRestart
+      [reason]
+      (super-stateless postRestart post-restart reason))
+     (supervisorStrategy
+      []
+      (if (nil? supervisor-strategy)
+	(proxy-super supervisorStrategy)
+	(let [{:keys [constructor function args]} supervisor-strategy
+	      mod-function (proxy [Function] []
+			     (apply [t] (function t)))]
+	  (apply constructor (concat args [mod-function])))))
+     (onReceive
+      [msg]
+      (binding [self this
+		context (.getContext this)
+		sender (.getSender this)
+		parent (.. this (getContext) (parent))]
+	(fun msg)))))
+
+(defmacro super-stateful [method function state & args]
+  `(if (nil? ~function)
+     (proxy-super ~method ~@args)
+     (let [next-state# (~function ~state ~@args)]
+       (reset! @~state next-state#))))
+
+(defn- proxy-stateful-actor
+  [fun {:keys [initial-state
+	       supervisor-strategy
+	       post-stop
+	       pre-start
+	       pre-restart
+	       post-restart]}]
   (let [state (atom initial-state)]
     #(proxy [UntypedActor] []
-       (postStop [] (proxy-super-if-nil post-stop postStop))
-       (preStart [] (proxy-super-if-nil pre-start preStart))
-       (preRestart [reason msg] (proxy-super-if-nil pre-restart preRestart reason msg))
-       (postRestart [reason] (proxy-super-if-nil post-restart restart))
+       (postStop
+	[]
+	(super-stateful postStop post-stop state))
+       (preStart
+	[]
+	(super-stateful preStart pre-start state))
+       (preRestart
+	[reason msg]
+	(super-stateful preRestart pre-restart state reason msg))
+       (postRestart
+	[reason]
+        (super-stateful postRestart post-restart state reason))
        (supervisorStrategy
 	[]
 	(if (nil? supervisor-strategy)
 	  (proxy-super supervisorStrategy)
-	  supervisor-strategy))
+	  (let [{:keys [constructor function args]} supervisor-strategy
+		mod-function (proxy [Function] []
+			       (apply [t] 
+				      (let [s state]
+					(function t @s))))]
+	    (apply constructor (concat args [mod-function])))))
        (onReceive
 	[msg]
 	(binding [self this
@@ -111,24 +168,11 @@
 	  (let [next-state (fun msg @state)]
 	    (reset! state next-state)))))))
 
-
-(defn- make-actor [ctx fun {name :name
-			    :as map}] 
-  (let [props (make-props (untyped-actor fun map))]
+(defn- make-actor [ctx fun actor-proxy {name :name :as map}] 
+  (let [props (make-props (actor-proxy fun map))]
     (if (nil? name)
       (.actorOf ctx props)
       (.actorOf ctx props name))))
-
-(defn stateful-actor
-  "Create a new actor. If called in the context of another actor,
-this function will create a parent-child relationship."
-  ([fun]
-     (stateful-actor fun {}))
-  ([fun map]
-     (make-actor
-      (if (nil? self) *actor-system* (.getContext self))
-      fun
-      map)))
 
 (defn actor-for [path]
   (.actorFor (if (nil? context) *actor-system* context) path))
@@ -136,6 +180,14 @@ this function will create a parent-child relationship."
 (defn actor
   ([fun]
      (actor fun {}))
-  ([fun map]
-     (stateful-actor (fn [msg _] (fun msg)) map)))
-
+  ([fun {stateful :stateful
+	 :as map}]
+     (make-actor
+      (if (nil? self)
+	*actor-system*
+	(.getContext self))
+      fun
+      (if stateful
+	proxy-stateful-actor
+	proxy-stateless-actor)
+      map)))

@@ -16,22 +16,20 @@
     (is (= "bar" val))))
 
 (deftest supervisor-invoked
-  (let [proof (atom nil)
-	child (fn [msg]
+  (let [child (fn [msg]
 		(throw (Exception. "woot")))
-	supervisor (actor (fn [msg]
+	supervisor (actor (fn [msg _]
 			    (let [c (actor child)]
 			      (! c msg)
-			      (reply "ok")))
-			  {:supervisor-strategy
+			      sender))
+			  {:stateful true
+			   :supervisor-strategy
 			   (one-for-one
-			    #(let [msg (.getMessage %)]
-			       (reset! proof msg)
+			    #(do
+			       (! %2 (.getMessage %1))
 			       stop)) })
 	val (wait (ask supervisor "hi" (millis 3000)))]
-    (Thread/sleep 1000)
-    (is (= "ok" val))
-    (is (= "woot" @proof))))
+    (is (= "woot" val))))
 
 (defn factorial [n]
   (loop [m n
@@ -67,7 +65,7 @@
 	      :n n}))
 
 (deftest factorial-sum
-  (let [sv (stateful-actor supervisor)
+  (let [sv (actor supervisor {:stateful true})
 	res (wait (? sv {:type :start, :value 10} (millis 10000)))]
     (is (= 4037913 res))))
 
