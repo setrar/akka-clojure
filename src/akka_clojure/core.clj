@@ -3,7 +3,8 @@
   akka-clojure.core
   (:import
    [akka.actor ActorRef ActorSystem Props UntypedActor
-    UntypedActorFactory OneForOneStrategy SupervisorStrategy]
+    UntypedActorFactory OneForOneStrategy SupervisorStrategy
+    PoisonPill]
    [akka.japi Function]
    [akka.pattern Patterns]
    [akka.dispatch Await]
@@ -25,7 +26,6 @@
 (def stop (SupervisorStrategy/stop))
 (def resume (SupervisorStrategy/resume))
 (def restart (SupervisorStrategy/restart))
-
 
 
 (defn to-millis [duration]
@@ -125,8 +125,8 @@
 (defmacro super-stateful [method function state & args]
   `(if (nil? ~function)
      (proxy-super ~method ~@args)
-     (let [next-state# (~function ~state ~@args)]
-       (reset! @~state next-state#))))
+     (let [next-state# (~function (deref ~state) ~@args)]
+       (reset! ~state next-state#))))
 
 (defn- proxy-stateful-actor
   [fun {:keys [initial-state
@@ -168,7 +168,7 @@
 	  (let [next-state (fun msg @state)]
 	    (reset! state next-state)))))))
 
-(defn- make-actor [ctx fun actor-proxy {name :name :as map}] 
+(defn- make-actor [ctx fun actor-proxy {name :name :as map}]
   (let [props (make-props (actor-proxy fun map))]
     (if (nil? name)
       (.actorOf ctx props)
@@ -177,7 +177,12 @@
 (defn actor-for [path]
   (.actorFor (if (nil? context) *actor-system* context) path))
 
+(defn poison [a]
+  (! a (PoisonPill/getInstance)))
+
 (defn actor
+  "Create an actor which invokes the passed function when a
+message is received."
   ([fun]
      (actor fun {}))
   ([fun {stateful :stateful

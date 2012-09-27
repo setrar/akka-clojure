@@ -5,6 +5,7 @@
    [akka-clojure.core]
    [clojure.test])
   (:import
+   [akka.pattern AskTimeoutException]
    [java.lang Thread]))
 
 (deftest ask-works
@@ -77,14 +78,28 @@
     (is (= "hi" val))
     (is (= 1 @proof))))
 
+(deftest stateful-prestart
+  (let [a (actor (fn [msg state]
+		   (reply state))
+		 {:stateful true
+		  :pre-start (fn [_]
+			       "pre-start")})
+	val (wait (? a "hello" (millis 1000)))]
+    (is (= val "pre-start"))))
 
-(deftest actor-test
-  (let [a (actor #(reply %))
-	val (wait (? a "hi" (millis 500)))]
-    (is (= "hi" val))))
+(deftest poison-works
+  (let [a (actor #(reply "hi"))]
+    (poison a)
+    (is (thrown? AskTimeoutException
+		 (wait (? a "hello" (millis 1000)))))))
 
 (deftest named-actor
   (let [a (actor #(reply %) {:name "foo"})
 	b (actor-for "foo")
 	val (wait (? a "hello" (millis 10000)))]
     (is (= "hello" val))))
+
+    
+
+		 
+    
