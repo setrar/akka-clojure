@@ -20,13 +20,13 @@ received message. The example below shows the basic usage.
 
 In some cases, it is desirable to carry state between invocations of
 the actor's receive callback.  For these cases, a *with-state* macro
-is provided. The result of this callback will become the state on the
-next invocation. For example:
+is provided. Whenever a message is received, the result of the 
+callback will become the state on the next invocation. For example:
 
 ```clojure
 (let [a (actor
      	  (with-state [count 0]
-	    (fn [msg count]
+	    (fn [msg]
               (println count)
      	      (inc count))))]
   (! a "hi")
