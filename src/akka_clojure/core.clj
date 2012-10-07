@@ -122,54 +122,8 @@
 		parent (.. this (getContext) (parent))]
 	(fun msg)))))
 
-(defmacro super-stateful [method function state & args]
-  `(if (nil? ~function)
-     (proxy-super ~method ~@args)
-     (let [next-state# (~function (deref ~state) ~@args)]
-       (reset! ~state next-state#))))
-
-(defn- proxy-stateful-actor
-  [fun {:keys [initial-state
-	       supervisor-strategy
-	       post-stop
-	       pre-start
-	       pre-restart
-	       post-restart]}]
-  (let [state (atom initial-state)]
-    #(proxy [UntypedActor] []
-       (postStop
-	[]
-	(super-stateful postStop post-stop state))
-       (preStart
-	[]
-	(super-stateful preStart pre-start state))
-       (preRestart
-	[reason msg]
-	(super-stateful preRestart pre-restart state reason msg))
-       (postRestart
-	[reason]
-        (super-stateful postRestart post-restart state reason))
-       (supervisorStrategy
-	[]
-	(if (nil? supervisor-strategy)
-	  (proxy-super supervisorStrategy)
-	  (let [{:keys [constructor function args]} supervisor-strategy
-		mod-function (proxy [Function] []
-			       (apply [t] 
-				      (let [s state]
-					(function t @s))))]
-	    (apply constructor (concat args [mod-function])))))
-       (onReceive
-	[msg]
-	(binding [self this
-		  context (.getContext this)
-		  sender (.getSender this)
-		  parent (.. this (getContext) (parent))]
-	  (let [next-state (fun msg @state)]
-	    (reset! state next-state)))))))
-
-(defn- make-actor [ctx fun actor-proxy {name :name :as map}]
-  (let [props (make-props (actor-proxy fun map))]
+(defn- make-actor [ctx fun {name :name :as map}]
+  (let [props (make-props (proxy-stateless-actor fun map))]
     (if (nil? name)
       (.actorOf ctx props)
       (.actorOf ctx props name))))
@@ -185,14 +139,22 @@
 message is received."
   ([fun]
      (actor fun {}))
-  ([fun {stateful :stateful
-	 :as map}]
+  ([fun map]
      (make-actor
       (if (nil? self)
 	*actor-system*
 	(.getContext self))
       fun
-      (if stateful
-	proxy-stateful-actor
-	proxy-stateless-actor)
       map)))
+
+(defmacro defactor [name args & body]
+  (if (not (= (count args) 1))
+    (throw (IllegalArgumentException. "Expected definition with one argument."))
+    `(def ~name (actor (fn ~args ~@body)))))
+
+(defmacro with-state [[sym initial-state] fun]
+  `(let [st# (atom ~initial-state)]
+     (fn [msg#]
+       (let [~sym @st#
+	     next-state# (~fun msg#)]
+	 (reset! st# next-state#)))))

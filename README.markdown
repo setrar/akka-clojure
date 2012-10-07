@@ -19,19 +19,18 @@ received message. The example below shows the basic usage.
 ```
 
 In some cases, it is desirable to carry state between invocations of
-the actor's receive callback.  In these cases, you must specify the
-*:stateful* keyword, and you must provide a second parameter to the
-callback. The result of this callback will become the state on the
+the actor's receive callback.  For these cases, a *with-state* macro
+is provided. The result of this callback will become the state on the
 next invocation. For example:
 
 ```clojure
-(let [a (actor (fn [msg count]
-          	   (println count)
-     		   (+ count 1))
-	       {:stateful true
-	        :initial-state 0})]
-     (! a "hi")
-     (! a "hi"))    
+(let [a (actor
+     	  (with-state [count 0]
+	    (fn [msg count]
+              (println count)
+     	      (inc count))))]
+  (! a "hi")
+  (! a "hi"))    
 ```
 
 When run, this will print "0" and "1" to the console.

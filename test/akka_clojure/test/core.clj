@@ -17,17 +17,17 @@
     (is (= "bar" val))))
 
 (deftest supervisor-invoked
-  (let [child (fn [msg]
+  (let [sendr (atom nil)
+	child (fn [msg]
 		(throw (Exception. "woot")))
-	supervisor (actor (fn [msg _]
+	supervisor (actor (fn [msg]
 			    (let [c (actor child)]
 			      (! c msg)
-			      sender))
-			  {:stateful true
-			   :supervisor-strategy
+			      (reset! sendr sender)))
+			  {:supervisor-strategy
 			   (one-for-one
 			    #(do
-			       (! %2 (.getMessage %1))
+			       (! @sendr (.getMessage %))
 			       stop)) })
 	val (wait (ask supervisor "hi" (millis 3000)))]
     (is (= "woot" val))))
@@ -66,7 +66,8 @@
 	      :n n}))
 
 (deftest factorial-sum
-  (let [sv (actor supervisor {:stateful true})
+  (let [sv (actor (with-state [state nil]
+		    (fn [msg] (supervisor msg state))))
 	res (wait (? sv {:type :start, :value 10} (millis 10000)))]
     (is (= 4037913 res))))
 
@@ -77,15 +78,6 @@
 	val (wait (? a "hello" (millis 10000)))]
     (is (= "hi" val))
     (is (= 1 @proof))))
-
-(deftest stateful-prestart
-  (let [a (actor (fn [msg state]
-		   (reply state))
-		 {:stateful true
-		  :pre-start (fn [_]
-			       "pre-start")})
-	val (wait (? a "hello" (millis 1000)))]
-    (is (= val "pre-start"))))
 
 (deftest poison-works
   (let [a (actor #(reply "hi"))]
@@ -98,8 +90,3 @@
 	b (actor-for "foo")
 	val (wait (? a "hello" (millis 10000)))]
     (is (= "hello" val))))
-
-    
-
-		 
-    
