@@ -25,7 +25,7 @@ callback will become the state on the next invocation. For example:
 
 ```clojure
 (let [a (actor
-     	  (with-state [count 0]
+          (with-state [count 0]
 	    (fn [msg]
               (println count)
      	      (inc count))))]
@@ -78,6 +78,19 @@ For example:
 
 ```clojure
 (actor #(.tell sender %))
+```
+
+Routing
+-------
+
+I'm still working on a nice way to hook in routing. The first try
+looks something like this (using the round-robin router):
+
+```clojure
+(let [rr (round-robin [5] 
+          (fn [msg] 
+            (do-something-with msg)))]
+  (! rr :test))
 ```
 
 

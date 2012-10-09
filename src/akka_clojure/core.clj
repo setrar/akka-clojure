@@ -5,6 +5,7 @@
    [akka.actor ActorRef ActorSystem Props UntypedActor
     UntypedActorFactory OneForOneStrategy SupervisorStrategy
     PoisonPill]
+   [akka.routing RoundRobinRouter]
    [akka.japi Function]
    [akka.pattern Patterns]
    [akka.dispatch Await]
@@ -75,11 +76,22 @@
        :function fun
        :args [max-retries within-time-range])))
 
-(defn- make-props [actor]
-  (.withCreator
-   (Props.)
-   (proxy [UntypedActorFactory] []
-     (create [] (actor)))))
+
+(defn- untyped-factory [actor]
+  (proxy [UntypedActorFactory] []
+	    (create [] (actor))))
+
+(defn- make-props
+  ([actor router]
+     (if (nil? router)
+       (make-props actor)
+       (.. (Props.)
+	   (withRouter router)
+	   (withCreator (untyped-factory actor)))))
+  ([actor]
+     (.withCreator
+      (Props.)
+      (untyped-factory actor))))
 
 (defmacro super-stateless [method fun & args]
   `(if (nil? ~fun)
@@ -87,8 +99,7 @@
      (~fun ~@args)))
 
 (defn- proxy-stateless-actor
-  [fun {:keys [initial-state
-	       supervisor-strategy
+  [fun {:keys [supervisor-strategy
 	       post-stop
 	       pre-start
 	       pre-restart
@@ -122,11 +133,10 @@
 		parent (.. this (getContext) (parent))]
 	(fun msg)))))
 
-(defn- make-actor [ctx fun {name :name :as map}]
-  (let [props (make-props (proxy-stateless-actor fun map))]
-    (if (nil? name)
-      (.actorOf ctx props)
-      (.actorOf ctx props name))))
+(defn- make-actor [ctx fun props {name :name :as map}]
+  (if (nil? name)
+    (.actorOf ctx props)
+    (.actorOf ctx props name)))
 
 (defn actor-for [path]
   (.actorFor (if (nil? context) *actor-system* context) path))
@@ -139,12 +149,16 @@
 message is received."
   ([fun]
      (actor fun {}))
-  ([fun map]
+  ([fun {router :router
+	 :as map}]
      (make-actor
       (if (nil? self)
 	*actor-system*
 	(.getContext self))
       fun
+      (make-props
+       (proxy-stateless-actor fun map)
+       router)
       map)))
 
 (defmacro defactor [name args & body]
@@ -158,3 +172,7 @@ message is received."
        (let [~sym @st#
 	     next-state# (~fun msg#)]
 	 (reset! st# next-state#)))))
+
+(defmacro round-robin [[n] fun]
+  `(actor ~fun
+	  {:router (RoundRobinRouter. ~n)}))
