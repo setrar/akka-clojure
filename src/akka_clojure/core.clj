@@ -76,10 +76,9 @@
        :function fun
        :args [max-retries within-time-range])))
 
-
 (defn- untyped-factory [actor]
   (proxy [UntypedActorFactory] []
-	    (create [] (actor))))
+    (create [] (actor))))
 
 (defn- make-props
   ([actor router]
@@ -93,12 +92,12 @@
       (Props.)
       (untyped-factory actor))))
 
-(defmacro super-stateless [method fun & args]
+(defmacro proxy-if-nil [method fun & args]
   `(if (nil? ~fun)
      (proxy-super ~method ~@args)
      (~fun ~@args)))
 
-(defn- proxy-stateless-actor
+(defn- proxy-actor
   [fun {:keys [supervisor-strategy
 	       post-stop
 	       pre-start
@@ -107,16 +106,16 @@
   #(proxy [UntypedActor] []
      (postStop
       []
-      (super-stateless postStop post-stop))
+      (proxy-if-nil postStop post-stop))
      (preStart
       []
-      (super-stateless preStart pre-start))
+      (proxy-if-nil preStart pre-start))
      (preRestart
       [reason msg]
-      (super-stateless preRestart pre-restart reason msg))
+      (proxy-if-nil preRestart pre-restart reason msg))
      (postRestart
       [reason]
-      (super-stateless postRestart post-restart reason))
+      (proxy-if-nil postRestart post-restart reason))
      (supervisorStrategy
       []
       (if (nil? supervisor-strategy)
@@ -133,11 +132,6 @@
 		parent (.. this (getContext) (parent))]
 	(fun msg)))))
 
-(defn- make-actor [ctx fun props {name :name :as map}]
-  (if (nil? name)
-    (.actorOf ctx props)
-    (.actorOf ctx props name)))
-
 (defn actor-for [path]
   (.actorFor (if (nil? context) *actor-system* context) path))
 
@@ -149,22 +143,21 @@
 message is received."
   ([fun]
      (actor fun {}))
-  ([fun {router :router
+  ([fun {name :name
+	 router :router
 	 :as map}]
-     (make-actor
-      (if (nil? self)
-	*actor-system*
-	(.getContext self))
-      fun
-      (make-props
-       (proxy-stateless-actor fun map)
-       router)
-      map)))
+     (let  [ctx (if (nil? self)
+		  *actor-system*
+		  (.getContext self))
+	    props (make-props
+		   (proxy-actor fun map)
+		   router)]
+       (if (nil? name)
+	 (.actorOf ctx props)
+	 (.actorOf ctx props name)))))
 
-(defmacro defactor [name args & body]
-  (if (not (= (count args) 1))
-    (throw (IllegalArgumentException. "Expected definition with one argument."))
-    `(def ~name (actor (fn ~args ~@body)))))
+(defmacro defactor [name [msg] & body]
+  `(def ~name (actor (fn [~msg] ~@body))))
 
 (defmacro with-state [[sym initial-state] fun]
   `(let [st# (atom ~initial-state)]
@@ -173,6 +166,5 @@ message is received."
 	     next-state# (~fun msg#)]
 	 (reset! st# next-state#)))))
 
-(defmacro round-robin [[n] fun]
-  `(actor ~fun
-	  {:router (RoundRobinRouter. ~n)}))
+(defn round-robin [[n] fun]
+  (make-actor fun {:router (RoundRobinRouter. n)}))

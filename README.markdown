@@ -93,6 +93,10 @@ looks something like this (using the round-robin router):
   (! rr :test))
 ```
 
+Alas, but this doesn't work well with the *with-state* macro since the
+state cannot be shared among
+
+
 
 
 ## License
