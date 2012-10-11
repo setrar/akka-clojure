@@ -5,7 +5,7 @@
    [akka.actor ActorRef ActorSystem Props UntypedActor
     UntypedActorFactory OneForOneStrategy SupervisorStrategy
     PoisonPill]
-   [akka.routing RoundRobinRouter]
+   [akka.routing RoundRobinRouter RandomRouter BroadcastRouter]
    [akka.japi Function]
    [akka.pattern Patterns]
    [akka.dispatch Await]
@@ -103,34 +103,37 @@
 	       pre-start
 	       pre-restart
 	       post-restart]}]
-  #(proxy [UntypedActor] []
-     (postStop
-      []
-      (proxy-if-nil postStop post-stop))
-     (preStart
-      []
-      (proxy-if-nil preStart pre-start))
-     (preRestart
-      [reason msg]
-      (proxy-if-nil preRestart pre-restart reason msg))
-     (postRestart
-      [reason]
-      (proxy-if-nil postRestart post-restart reason))
-     (supervisorStrategy
-      []
-      (if (nil? supervisor-strategy)
-	(proxy-super supervisorStrategy)
-	(let [{:keys [constructor function args]} supervisor-strategy
-	      mod-function (proxy [Function] []
-			     (apply [t] (function t)))]
-	  (apply constructor (concat args [mod-function])))))
-     (onReceive
-      [msg]
-      (binding [self this
-		context (.getContext this)
-		sender (.getSender this)
-		parent (.. this (getContext) (parent))]
-	(fun msg)))))
+  #(let [f (if (map? fun)
+	     (eval ((:fun fun)))
+	     fun)]
+     (proxy [UntypedActor] []
+       (postStop
+	[]
+	(proxy-if-nil postStop post-stop))
+       (preStart
+	[]
+	(proxy-if-nil preStart pre-start))
+       (preRestart
+	[reason msg]
+	(proxy-if-nil preRestart pre-restart reason msg))
+       (postRestart
+	[reason]
+	(proxy-if-nil postRestart post-restart reason))
+       (supervisorStrategy
+	[]
+	(if (nil? supervisor-strategy)
+	  (proxy-super supervisorStrategy)
+	  (let [{:keys [constructor function args]} supervisor-strategy
+		mod-function (proxy [Function] []
+			       (apply [t] (function t)))]
+	    (apply constructor (concat args [mod-function])))))
+       (onReceive
+	[msg]
+	(binding [self this
+		  context (.getContext this)
+		  sender (.getSender this)
+		  parent (.. this (getContext) (parent))]
+	  (f msg))))))
 
 (defn actor-for [path]
   (.actorFor (if (nil? context) *actor-system* context) path))
@@ -160,11 +163,19 @@ message is received."
   `(def ~name (actor (fn [~msg] ~@body))))
 
 (defmacro with-state [[sym initial-state] fun]
-  `(let [st# (atom ~initial-state)]
-     (fn [msg#]
-       (let [~sym @st#
-	     next-state# (~fun msg#)]
-	 (reset! st# next-state#)))))
+  {:fun
+   `(fn []
+      (let [st# (atom ~initial-state)]
+	(fn [msg#]
+	  (let [~sym @st#
+		next-state# (~fun msg#)]
+	    (reset! st# next-state#)))))})
+  
+(defn rr-router [[n] fun]
+  (actor fun {:router (RoundRobinRouter. n)}))
 
-(defn round-robin [[n] fun]
-  (make-actor fun {:router (RoundRobinRouter. n)}))
+(defn random-router [[n] fun]
+  (actor fun {:router (RandomRouter. n)}))
+
+(defn broadcast-router [[n] fun]
+  (actor fun {:router (BroadcastRouter. n)}))

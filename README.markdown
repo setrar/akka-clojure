@@ -87,20 +87,34 @@ I'm still working on a nice way to hook in routing. The first try
 looks something like this (using the round-robin router):
 
 ```clojure
-(let [rr (round-robin [5] 
+(let [rr (rr-router [5] 
           (fn [msg] 
             (do-something-with msg)))]
   (! rr :test))
 ```
 
-Alas, but this doesn't work well with the *with-state* macro since the
-state cannot be shared among
+This can even work with the *with-state* macro, in which
+case each actor uses a different atom (if you want a shared
+variable, a ref is probably the way to go).
 
+```clojure
+(let [a (rr-router [2]
+          (with-state [count 0]
+	    (fn [msg]
+              (println count)
+     	      (inc count))))]
+  (! a "hi")
+  (! a "hi"))    
+```
+
+This time, "0" will be printed twice to the console. This works
+similarly with *random-router*, *broadcast-router*, 
+and *smallest-mailbox-router*.
 
 
 
 ## License
 
-Copyright (C) 2012 FIXME
+Copyright (C) 2012
 
 Distributed under the Eclipse Public License, the same as Clojure.
