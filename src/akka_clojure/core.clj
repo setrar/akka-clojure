@@ -5,7 +5,8 @@
    [akka.actor ActorRef ActorSystem Props UntypedActor
     UntypedActorFactory OneForOneStrategy SupervisorStrategy
     PoisonPill]
-   [akka.routing RoundRobinRouter RandomRouter BroadcastRouter]
+   [akka.routing RoundRobinRouter RandomRouter BroadcastRouter
+    SmallestMailboxRouter]
    [akka.japi Function]
    [akka.pattern Patterns]
    [akka.dispatch Await]
@@ -179,3 +180,6 @@ message is received."
 
 (defn broadcast-router [[n] fun]
   (actor fun {:router (BroadcastRouter. n)}))
+
+(defn smallest-mailbox-router [[n] fun]
+  (actor fun {:router (SmallestMailboxRouter. n)}))
