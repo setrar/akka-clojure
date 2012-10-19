@@ -103,7 +103,7 @@ variable, a ref is probably the way to go).
 ```clojure
 (let [a (actor
           (with-state [count 0]
-	    (fn [msg]
+            (fn [msg]
               (println count)
      	      (inc count)))
           { :router (RoundRobinActor. 2) })]
