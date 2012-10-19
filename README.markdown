@@ -83,13 +83,16 @@ For example:
 Routing
 -------
 
-I'm still working on a nice way to hook in routing. The first try
-looks something like this (using the round-robin router):
+Routers can be created by adding a :router property. For
+example, to create a round robin actor, you can do:
 
 ```clojure
-(let [rr (rr-router [5] 
+(import '(akka.routing RoundRobinActor))
+
+(let [rr (actor
           (fn [msg] 
-            (do-something-with msg)))]
+            (do-something-with msg))
+          { :router (RoundRobinActor. 3) }]
   (! rr :test))
 ```
 
@@ -98,19 +101,19 @@ case each actor uses a different atom (if you want a shared
 variable, a ref is probably the way to go).
 
 ```clojure
-(let [a (rr-router [2]
+(let [a (actor
           (with-state [count 0]
 	    (fn [msg]
               (println count)
-     	      (inc count))))]
+     	      (inc count)))
+          { :router (RoundRobinActor. 2) })]
   (! a "hi")
-  (! a "hi"))    
+  (! a "hi")
+  (! a "hi"))
 ```
 
-This time, "0" will be printed twice to the console. This works
-similarly with *random-router*, *broadcast-router*, 
-and *smallest-mailbox-router*.
-
+This time, "0" will be printed twice to the console followed
+by "1". 
 
 
 ## License

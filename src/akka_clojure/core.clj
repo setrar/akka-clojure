@@ -81,24 +81,28 @@
   (proxy [UntypedActorFactory] []
     (create [] (actor))))
 
-(defn- make-props
-  ([actor router]
-     (if (nil? router)
-       (make-props actor)
-       (.. (Props.)
-	   (withRouter router)
-	   (withCreator (untyped-factory actor)))))
-  ([actor]
-     (.withCreator
-      (Props.)
-      (untyped-factory actor))))
+
+(defmulti #^{:private true} set-property
+  (fn [props [k v]] k))
+
+(defmethod set-property :router [props [_ router]]
+	   (.withRouter props router))
+
+(defmethod set-property :dispatcher [props [_ dispatcher]]
+	   (.withDispatcher props dispatcher))
+
+(defmethod set-property :actor [props [_ actor]]
+	   (.withCreator props (untyped-factory actor)))
+
+(defn props [map]
+  (reduce set-property (Props.) map))
 
 (defmacro proxy-if-nil [method fun & args]
   `(if (nil? ~fun)
      (proxy-super ~method ~@args)
      (~fun ~@args)))
 
-(defn- proxy-actor
+(defn- untyped-actor
   [fun {:keys [supervisor-strategy
 	       post-stop
 	       pre-start
@@ -147,21 +151,20 @@
 message is received."
   ([fun]
      (actor fun {}))
-  ([fun {name :name
-	 router :router
-	 :as map}]
-     (let  [ctx (if (nil? self)
+  ([fun map]
+     (let [{name :name :as metadata} map
+	   props (props (assoc (select-keys metadata
+					    [:router :dispatcher])
+			  :actor (untyped-actor fun metadata)))
+	   ctx (if (nil? self)
 		  *actor-system*
-		  (.getContext self))
-	    props (make-props
-		   (proxy-actor fun map)
-		   router)]
+		  (.getContext self))]
        (if (nil? name)
 	 (.actorOf ctx props)
 	 (.actorOf ctx props name)))))
 
-(defmacro defactor [name [msg] & body]
-  `(def ~name (actor (fn [~msg] ~@body))))
+(defmacro defactor [name properties [msg] & body]
+  `(def ~name (actor (fn [~msg] ~@body) ~properties)))
 
 (defmacro with-state [[sym initial-state] fun]
   {:fun
@@ -172,14 +175,3 @@ message is received."
 		next-state# (~fun msg#)]
 	    (reset! st# next-state#)))))})
   
-(defn rr-router [[n] fun]
-  (actor fun {:router (RoundRobinRouter. n)}))
-
-(defn random-router [[n] fun]
-  (actor fun {:router (RandomRouter. n)}))
-
-(defn broadcast-router [[n] fun]
-  (actor fun {:router (BroadcastRouter. n)}))
-
-(defn smallest-mailbox-router [[n] fun]
-  (actor fun {:router (SmallestMailboxRouter. n)}))

@@ -6,7 +6,10 @@
    [clojure.test])
   (:import
    [akka.pattern AskTimeoutException]
+   [akka.routing BroadcastRouter]
    [java.lang Thread]))
+
+
 
 (deftest ask-works
   (let [a (actor (fn [msg]
@@ -20,15 +23,16 @@
   (let [sendr (atom nil)
 	child (fn [msg]
 		(throw (Exception. "woot")))
-	supervisor (actor (fn [msg]
-			    (let [c (actor child)]
-			      (! c msg)
-			      (reset! sendr sender)))
-			  {:supervisor-strategy
-			   (one-for-one
-			    #(do
-			       (! @sendr (.getMessage %))
-			       stop)) })
+	supervisor (actor
+		    (fn [msg]
+		      (let [c (actor child)]
+			(! c msg)
+			(reset! sendr sender)))
+		    {:supervisor-strategy
+		     (one-for-one
+		      #(do
+			 (! @sendr (.getMessage %))
+			 stop)) })
 	val (wait (ask supervisor "hi" (millis 3000)))]
     (is (= "woot" val))))
 
@@ -73,8 +77,9 @@
 
 (deftest pre-start
   (let [proof (atom 0)
-	a (actor (fn [msg] (reply "hi"))
-		 { :pre-start #(reset! proof 1) })
+	a (actor
+	   (fn [msg] (reply "hi"))
+	   { :pre-start #(reset! proof 1) })
 	val (wait (? a "hello" (millis 10000)))]
     (is (= "hi" val))
     (is (= 1 @proof))))
@@ -90,3 +95,13 @@
 	b (actor-for "foo")
 	val (wait (? a "hello" (millis 10000)))]
     (is (= "hello" val))))
+
+
+(deftest broadcast-router-test
+  (let [t (atom 0)
+	a (actor
+	   (fn [msg] (swap! t + 1))
+	   { :router (BroadcastRouter. 3)})]
+    (! a "hi")
+    (Thread/sleep 1000)
+    (is (= 3 @t))))
