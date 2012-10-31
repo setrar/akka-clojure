@@ -4,6 +4,15 @@ akka-clojure
 
 Akka-clojure is a simple Clojure wrapper for Akka.
 
+Install
+-------
+
+Now up on clojars. Include the following dependency in your project.clj.
+
+```clojure
+[akka/akka-clojure "0.1.0"]
+```
+
 Usage
 -----
 
