@@ -1,4 +1,4 @@
-(defproject akka/akka-clojure "0.1.0"
+(defproject akka/akka-clojure "0.2.0-SNAPSHOT"
   :description "An interface for using Akka through Clojure"
   :dependencies [[org.clojure/clojure "1.4.0"]
 		 [com.typesafe.akka/akka-actor "2.0.3"]]

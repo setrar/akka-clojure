@@ -144,6 +144,7 @@
   (.actorFor (if (nil? context) *actor-system* context) path))
 
 (defn poison [a]
+  "Shortcut for killing a actor through Akka's poison pill."
   (! a (PoisonPill/getInstance)))
 
 (defn actor
@@ -175,3 +176,14 @@ message is received."
 		next-state# (~fun msg#)]
 	    (reset! st# next-state#)))))})
   
+(defmacro state-machine [init-clause & when-clauses]
+  (let [init-state (second init-clause)
+	action (gensym "action")]
+    `(actor (with-state [st# ~(second init-clause)]
+	      (fn [~action]
+		(case st#
+		      ~@(apply concat
+			       (for [when-clause when-clauses]
+				 (let [[_ state [arg] body] when-clause]
+				   `(~state (let [~arg ~action]
+					      ~body)))))))))))

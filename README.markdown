@@ -125,6 +125,59 @@ This time, "0" will be printed twice to the console followed
 by "1". 
 
 
+Finite State Machines
+---------------------
+
+The with-state macro is really intended for the implementation of
+finite state machines such as is supported by Akka (see
+[here](http://doc.akka.io/docs/akka/2.0.3/scala/fsm.html)).  This
+works particularly nicely with Clojure multimethods.  Consider the
+turnstyle example (from
+[here](http://en.wikipedia.org/wiki/Finite-state_machine#Example:_a_turnstile)).
+
+```clojure
+(defmulti turnstyle (fn [s a] s))
+
+(defmethod turnstyle :locked [_ action]
+  (case action
+    :coin :unlocked
+    :push :locked))
+
+(defmethod turnstyle :unlocked [_ action]
+  (case action
+    :coin :unlocked
+    :push :locked))
+
+(let [sm (actor (with-state [state :locked] 
+                  #(turnstyle state %)))]
+  (! sm :coin)
+  (! sm :push))
+```
+
+This is ok, but admittedly, a bit clumsy feeling, so the macro
+*state-machine* was created to get a bit closer to the DSL that Akka
+has for its Scala API. Here's the same example:
+
+```clojure
+(def turnstyle
+  (state-machine
+    (init :locked)
+    (when :locked [action]
+      (case action
+        :coin :unlocked
+        :push :locked))
+    (when :unlocked [action]
+      (case action
+        :coin :unlocked
+        :push :locked))))
+
+(! turnstyle :coin)    
+(! turnstyle :push)
+```
+
+Note: this macro is experimental and may change in the future.
+
+
 ## License
 
 Copyright (C) 2012
