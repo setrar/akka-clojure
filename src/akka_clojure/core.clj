@@ -5,8 +5,6 @@
    [akka.actor ActorRef ActorSystem Props UntypedActor
     UntypedActorFactory OneForOneStrategy SupervisorStrategy
     PoisonPill]
-   [akka.routing RoundRobinRouter RandomRouter BroadcastRouter
-    SmallestMailboxRouter]
    [akka.japi Function]
    [akka.pattern Patterns]
    [akka.dispatch Await]
@@ -41,8 +39,10 @@
     :value val))
 
 (defn ask
-  ([^ActorRef actor msg timeout]
-     (Patterns/ask actor msg (to-millis timeout))))
+  "Use the Akka ask pattern. Returns a future object
+  which can be waited on by calling 'wait'"
+  [^ActorRef actor msg timeout]
+     (Patterns/ask actor msg (to-millis timeout)))
 
 (def ? ask)
 
@@ -55,8 +55,8 @@
 			   (:unit duration)))))
 
 (defn tell
-  "Send a message to an actor."
-  [actor msg]
+  "Send an asynchronous message to an actor."
+  [^ActorRef actor msg]
   (.tell actor msg))
 
 (def ! tell)
@@ -149,7 +149,14 @@
 
 (defn actor
   "Create an actor which invokes the passed function when a
-message is received."
+  message is received.
+
+  Example:
+  (actor
+   (with-state [count 0]
+     (fn [msg]
+       (println count)
+       (inc count))))"
   ([fun]
      (actor fun {}))
   ([fun map]
@@ -177,6 +184,19 @@ message is received."
 	    (reset! st# next-state#)))))})
   
 (defmacro state-machine [init-clause & when-clauses]
+  "Create an actor which implements the declared state machine.
+
+  Example:
+     (state-machine
+       (init :locked)
+       (when :locked [action]
+         (case action
+           :coin :unlocked
+           :push :locked))
+       (when :unlocked [action]
+         (case action
+           :coin :unlocked
+           :push :locked))))"
   (let [init-state (second init-clause)
 	action (gensym "action")]
     `(actor (with-state [st# ~(second init-clause)]
