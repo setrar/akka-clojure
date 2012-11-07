@@ -153,10 +153,8 @@
 
   Example:
   (actor
-   (with-state [count 0]
-     (fn [msg]
-       (println count)
-       (inc count))))"
+    (fn [msg]
+      (println msg)))"
   ([fun]
      (actor fun {}))
   ([fun map]
@@ -175,6 +173,15 @@
   `(def ~name (actor (fn [~msg] ~@body) ~properties)))
 
 (defmacro with-state [[sym initial-state] fun]
+  "Macro to allow an actor to carry state over the course of
+  invocations.
+
+  Example:
+  (actor
+    (with-state [count 0]
+      (fn [msg]
+         (println count)
+     	 (inc count))"
   {:fun
    `(fn []
       (let [st# (atom ~initial-state)]
