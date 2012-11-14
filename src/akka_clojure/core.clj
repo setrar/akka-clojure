@@ -1,6 +1,8 @@
 (ns #^{:author "Jason"
        :doc "Simple clojure library for interacting with Akka actors"}
   akka-clojure.core
+  (:use
+   [clojure.core.match :only (match)])
   (:import
    [akka.actor ActorRef ActorSystem Props UntypedActor
     UntypedActorFactory OneForOneStrategy SupervisorStrategy
@@ -54,10 +56,13 @@
 			   (:value duration)
 			   (:unit duration)))))
 
-(defn tell
-  "Send an asynchronous message to an actor."
-  [^ActorRef actor msg]
-  (.tell actor msg))
+(defmulti tell (fn [a b] (class a)))
+
+(defmethod tell ActorRef [actor msg]
+	   (.tell actor msg))
+
+(defmethod tell UntypedActor [actor msg]
+	   (tell (.getSelf actor) msg))
 
 (def ! tell)
 
@@ -190,27 +195,37 @@
 		next-state# (~fun msg#)]
 	    (reset! st# next-state#)))))})
   
-(defmacro state-machine [init-clause & when-clauses]
-  "Create an actor which implements the declared state machine.
+
+(defmacro state-machine [[action] init-clause & when-clauses]
+  "Create an actor implementing the declared state machine.
 
   Example:
-     (state-machine
+     (state-machine [action]
        (init :locked)
-       (when :locked [action]
+       (when :locked
          (case action
            :coin :unlocked
            :push :locked))
-       (when :unlocked [action]
+       (when :unlocked
          (case action
            :coin :unlocked
-           :push :locked))))"
-  (let [init-state (second init-clause)
-	action (gensym "action")]
-    `(actor (with-state [st# ~(second init-clause)]
-	      (fn [~action]
-		(case st#
-		      ~@(apply concat
-			       (for [when-clause when-clauses]
-				 (let [[_ state [arg] body] when-clause]
-				   `(~state (let [~arg ~action]
-					      ~body)))))))))))
+           :push :locked))
+       (else :locked))"
+  (if (not= 'init (first init-clause))
+    (throw (IllegalArgumentException. (str "Expected 'init but found " (first init-clause))))
+    (let [init-state (second init-clause)]
+      `(actor (with-state [st# ~(second init-clause)]
+		(fn [~action]
+		  (match st#
+			~@(loop [clauses when-clauses
+				 cases '()]
+			    (if (empty? clauses)
+			      cases
+			      (let [clause (first clauses)]
+				(if (= 'when (first clause))
+				  (let [[_ state body] clause]
+				    (recur (rest clauses) (concat cases (list state body))))
+				  (if (and (= 'else (first clause)) (empty? (rest clauses)))
+				    (concat cases (list (second clause)))
+				    (throw (IllegalArgumentException. (str "Unhandled syntax " + (first clause))))))))))))))))
+

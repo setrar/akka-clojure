@@ -105,3 +105,20 @@
     (! a "hi")
     (Thread/sleep 1000)
     (is (= 3 @t))))
+
+
+(deftest state-machine-test
+  (let [st (atom nil)
+	sm (state-machine [action]
+	    (init :foo)
+	    (when :foo
+	      (do (reset! st :foo) :bar))
+	    (when :bar
+	      (do (reset! st :bar) :taz))
+	    (when :taz
+	      (do (reset! st :taz) :foo)))]
+    (! sm "hi")
+    (! sm "hi")
+    (! sm "hi")
+    (Thread/sleep 1000)
+    (is (= :taz @st))))

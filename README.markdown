@@ -154,19 +154,18 @@ turnstyle example (from
   (! sm :push))
 ```
 
-This is ok, but admittedly, a bit clumsy feeling, so the macro
-*state-machine* was created to get a bit closer to the DSL that Akka
-has for its Scala API. Here's the same example:
+This is ok, but admittedly, a bit clumsy.  The macro *state-machine*
+was created to get a bit closer to Akka API. Here's the same example:
 
 ```clojure
 (def turnstyle
-  (state-machine
+  (state-machine [action]
     (init :locked)
-    (when :locked [action]
+    (when :locked
       (case action
         :coin :unlocked
         :push :locked))
-    (when :unlocked [action]
+    (when :unlocked
       (case action
         :coin :unlocked
         :push :locked))))
@@ -174,6 +173,12 @@ has for its Scala API. Here's the same example:
 (! turnstyle :coin)    
 (! turnstyle :push)
 ```
+
+Underneath the covers, when a message is received, the current state
+is matched against the when clauses using
+[match](https://github.com/clojure/core.match) (so all the magic that
+works there, should work here too). Then the body for that clause is
+evaluated.
 
 Note: this macro is experimental and may change in the future.
 
