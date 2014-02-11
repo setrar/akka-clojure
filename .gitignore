@@ -8,3 +8,6 @@
 /checkouts
 /.lein-deps-sum
 /target
+.classpath
+.project
+

@@ -6,5 +6,7 @@
   :url "https://github.com/jasongustafson/akka-clojure"
   :license {:name "Eclipse Public License"
 	    :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :repositories {"akka.repository" "http://repo.typesafe.com/typesafe/releases/"})
+  :repositories {"akka.repository" "http://repo.typesafe.com/typesafe/releases/"}
+  :plugins [[no-man-is-an-island/lein-eclipse "2.0.0"]]
+)
     
