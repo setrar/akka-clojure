@@ -1,7 +1,7 @@
-(defproject akka/akka-clojure "0.2.0-SNAPSHOT"
+(defproject akka/akka-clojure "0.2.0"
   :description "An interface for using Akka through Clojure"
-  :dependencies [[org.clojure/clojure "1.4.0"]
-		 [org.clojure/core.match "0.2.0-alpha11"]
+  :dependencies [[org.clojure/clojure "1.6.0"]
+		 [org.clojure/core.match "0.2.1"]
 		 [com.typesafe.akka/akka-actor_2.11 "2.3.6"]]
   :url "https://github.com/jasongustafson/akka-clojure"
   :license {:name "Eclipse Public License"
