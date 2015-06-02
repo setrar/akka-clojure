@@ -2,7 +2,8 @@
 akka-clojure
 ============
 
-Akka-clojure is a simple Clojure wrapper for Akka.
+Akka-clojure is a simple Clojure wrapper for Akka. Forked from [here](https://github.com/setrar/akka-clojure),
+version 0.2.0 fully supports Akka 2.3.6 and Clojure 1.6.0.
 
 Install
 -------
@@ -10,7 +11,7 @@ Install
 Now up on clojars. Include the following dependency in your project.clj.
 
 ```clojure
-[akka/akka-clojure "0.1.0"]
+[akka/akka-clojure "0.2.0"]
 ```
 
 Usage

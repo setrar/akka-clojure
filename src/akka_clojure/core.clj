@@ -9,8 +9,8 @@
     PoisonPill]
    [akka.japi Function]
    [akka.pattern Patterns]
-   [akka.dispatch Await]
-   [akka.util Duration]
+   [scala.concurrent Await]
+   [scala.concurrent.duration Duration]
    [java.util.concurrent TimeUnit]))
 
 (def ^:dynamic *actor-system*
@@ -59,10 +59,10 @@
 (defmulti tell (fn [a b] (class a)))
 
 (defmethod tell ActorRef [actor msg]
-	   (.tell actor msg))
+	   (.tell actor msg nil))
 
 (defmethod tell UntypedActor [actor msg]
-	   (tell (.getSelf actor) msg))
+	   (tell (.getSelf actor) msg nil))
 
 (def ! tell)
 
@@ -97,10 +97,10 @@
 	   (.withDispatcher props dispatcher))
 
 (defmethod set-property :actor [props [_ actor]]
-	   (.withCreator props (untyped-factory actor)))
+	   (Props/create (untyped-factory actor)))
 
 (defn props [map]
-  (reduce set-property (Props.) map))
+  (reduce set-property (Props/empty) map))
 
 (defmacro proxy-if-nil [method fun & args]
   `(if (nil? ~fun)
